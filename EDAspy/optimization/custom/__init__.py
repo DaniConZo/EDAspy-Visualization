@@ -6,6 +6,5 @@
 from .initialization_models import MultiGaussGenInit, UniBinGenInit, UniGaussGenInit, UniformGenInit, \
     CategoricalSampling, LatinHypercubeSampling
 
-from .probabilistic_models import GBN, MultiGauss, UniGauss, UniBin, SPBN, KDEBN, UniKDE, BN, UniCategorical, \
-    AdaptUniGauss
+from .probabilistic_models import GBN, MultiGauss, UniGauss, UniBin, SPBN, KDEBN, UniKDE, BN, UniCategorical
 from .eda_custom import EDACustom

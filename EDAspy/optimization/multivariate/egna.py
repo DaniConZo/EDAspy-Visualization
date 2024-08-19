@@ -51,16 +51,15 @@ class EGNA(EDA):
                  max_iter: int,
                  dead_iter: int,
                  n_variables: int,
-                 lower_bound: Union[np.array, List[float], float] = None,
-                 upper_bound: Union[np.array, List[float], float] = None,
+                 lower_bound: Union[np.array, List[float], float],
+                 upper_bound: Union[np.array, List[float], float],
                  alpha: float = 0.5,
                  elite_factor: float = 0.4,
                  disp: bool = True,
                  black_list: list = None,
                  white_list: list = None,
                  parallelize: bool = False,
-                 init_data: np.array = None,
-                 w_noise: float = .5):
+                 init_data: np.array = None):
         r"""
         :param size_gen: Population size. Number of individuals in each generation.
         :param max_iter: Maximum number of iterations during runtime.
@@ -82,7 +81,7 @@ class EGNA(EDA):
 
         super().__init__(size_gen=size_gen, max_iter=max_iter, dead_iter=dead_iter,
                          n_variables=n_variables, alpha=alpha, elite_factor=elite_factor, disp=disp,
-                         parallelize=parallelize, init_data=init_data, w_noise=w_noise)
+                         parallelize=parallelize, init_data=init_data)
 
         self.vars = [str(i) for i in range(n_variables)]
         # self.landscape_bounds = landscape_bounds

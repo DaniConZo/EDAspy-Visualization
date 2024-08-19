@@ -52,7 +52,6 @@ class GBN(ProbabilisticModel):
             self.sample = self._sample_normal
 
         self.id = 4
-        self.fitted = False
 
     def learn(self, dataset: np.array, *args, **kwargs):
         """
@@ -76,7 +75,20 @@ class GBN(ProbabilisticModel):
         self.pm.fit(data)
         self.top_order = self.pm.graph().topological_sort()
 
-        self.fitted = True
+        #################################################################################################################
+        ### Para ver que ocurría en el caso del problema de optimización en un plano, que aprendía relaciones entre las variables y sampleaba en una línea.
+        #### Habría que modificar los factores que aprende
+        # Crear factor
+        # if self.print_structure()[0][0]=='0':
+        #     factor = LinearGaussianCPD('1', ['0'])
+        #     factor.beta = np.array([self.pm.cpd('1').beta[]])
+
+        # copiar betas y variance
+
+        ##self.pm.cpd
+
+        # modificar SOLO beta_1
+        #################################################################################################################    
 
     def print_structure(self) -> list:
         """
@@ -226,10 +238,3 @@ class GBN(ProbabilisticModel):
         sigma_1_2 = sigma_11 - np.dot(sigma_12, np.dot(inv_sigma_22, sigma_21))
 
         return mu_1_2, sigma_1_2
-
-    def maximum_a_posteriori(self, evidence, var_names):
-        # TODO: test this
-        assert self.fitted, "The Bayesian network has not been fitted yet. Please, learn it first."
-
-        mu_map, sigma_map = self.inference(evidence=evidence, var_names=var_names)
-        return mu_map

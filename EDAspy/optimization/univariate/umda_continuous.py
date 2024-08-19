@@ -58,16 +58,15 @@ class UMDAc(EDA):
                  max_iter: int,
                  dead_iter: int,
                  n_variables: int,
-                 lower_bound: Union[np.array, List[float], float] = None,
-                 upper_bound: Union[np.array, List[float], float] = None,
+                 lower_bound: Union[np.array, List[float], float],
+                 upper_bound: Union[np.array, List[float], float],
                  alpha: float = 0.5,
                  vector: np.array = None,
                  lower_factor: float = 0.5,
                  elite_factor: float = 0.4,
                  disp: bool = True,
                  parallelize: bool = False,
-                 init_data: np.array = None,
-                 w_noise: float = .5):
+                 init_data: np.array = None):
         r"""
         :param size_gen: Population size of each generation.
         :param max_iter: Maximum number of function evaluations.
@@ -83,8 +82,6 @@ class UMDAc(EDA):
         :param parallelize: True if the evaluation of the solutions is desired to be parallelized in multiple cores.
         :param init_data: Numpy array containing the data the EDA is desired to be initialized from. By default, an
         initializer is used.
-        :param w_noise: Intensity of the Gaussian white noise added to each generation in order to avoid genetic drift.
-        :type w_noise: float
         :type lower_bound: List of lower bounds of size equal to number of variables OR single bound to all dimensions.
         :type upper_bound: List of upper bounds of size equal to number of variables OR single bound to all dimensions.
         """
@@ -95,7 +92,7 @@ class UMDAc(EDA):
 
         super().__init__(size_gen=size_gen, max_iter=max_iter, dead_iter=dead_iter, n_variables=n_variables,
                          alpha=alpha, elite_factor=elite_factor, disp=disp, parallelize=parallelize,
-                         init_data=init_data, w_noise=w_noise)
+                         init_data=init_data)
 
         if self.vector is not None:
             assert self.vector.shape == (2, n_variables)

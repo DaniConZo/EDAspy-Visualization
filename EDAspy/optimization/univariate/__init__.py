@@ -7,4 +7,3 @@ from .umda_continuous import UMDAc
 from .umda_binary import UMDAd
 from .keda import UnivariateKEDA
 from .umda_categorical import UMDAcat
-from .pbil import PBIL

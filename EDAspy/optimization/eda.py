@@ -8,7 +8,8 @@ from .custom.probabilistic_models import ProbabilisticModel
 from .custom.initialization_models import GenInit
 from .utils import _parallel_apply_along_axis
 from time import process_time
-
+from .custom.probabilistic_models import UniGauss
+import copy
 
 class EDA(ABC):
 
@@ -27,11 +28,11 @@ class EDA(ABC):
                  dead_iter: int,
                  n_variables: int,
                  alpha: float = 0.5,
+                 tolerance: float = 0.001,
                  elite_factor: float = 0.4,
                  disp: bool = True,
                  parallelize: bool = False,
                  init_data: np.array = None,
-                 w_noise: float = .5,
                  *args, **kwargs):
 
         self.disp = disp
@@ -44,14 +45,9 @@ class EDA(ABC):
         self.elite_length = int(size_gen * elite_factor)
         self.parallelize = parallelize
 
-        # Gaussian white noise definition
-        if (w_noise != 0) and (w_noise is not None):
-            self.w_noise = w_noise
-        else:
-            self.w_noise = 0
-
         assert dead_iter <= self.max_iter, 'dead_iter must be lower than max_iter'
         self.dead_iter = dead_iter
+        self.tolerance = tolerance
 
         self.best_mae_global = 999999999999
         self.best_ind_global = np.array([0]*self.n_variables)
@@ -145,15 +141,13 @@ class EDA(ABC):
             "parallelize": self.parallelize
         }
 
-    def minimize(self, cost_function: callable, output_runtime: bool = True, ftol: float = 1e-8,
-                 *args, **kwargs) -> EdaResult:
+    def minimize(self, cost_function: callable, output_runtime: bool = True, *args, **kwargs) -> EdaResult:
         """
         Minimize function to execute the EDA optimization. By default, the optimizer is designed to minimize a cost
         function; if maximization is desired, just add a minus sign to your cost function.
 
         :param cost_function: cost function to be optimized and accepts an array as argument.
         :param output_runtime: true if information during runtime is desired.
-        :param ftol: termination tolerance
         :return: EdaResult object with results and information.
         :rtype: EdaResult
         """
@@ -169,24 +163,77 @@ class EDA(ABC):
         self.elite_temp = np.array([self.generation[0, :]])
         self.evaluations_elite = np.array([self.evaluations.item(0)])
 
-        best_mae_local = self.best_mae_global = min(self.evaluations)
+        best_mae_local = min(self.evaluations)
+        self.best_mae_global = min(self.evaluations)
         history.append(best_mae_local)
-        best_ind_local = self.best_ind_global = np.where(self.evaluations == best_mae_local)[0][0]
+        aux = np.where(self.evaluations == best_mae_local)[0][0]
+        best_ind_local = aux
+        self.best_ind_global = aux
+        
+        ###############Modified by Daniel Conde###########
+        if self.disp:
+            print('IT: ',0, '\tBest cost: ', self.best_mae_global) ## If desired printing the best element in starting gen
+            
+        # array to store best individual created in each generation. Different from best global individual
+        best_ind_hist = self.generation[best_ind_local]
+        ##this is a np array of 1D we reshape it so rows will be individuals and columns will be variables
+        best_ind_hist = np.reshape(best_ind_hist, (1, best_ind_hist.size))
 
-        if self.w_noise == 0:
-            white_noise = 0
-        elif self.w_noise == -1:
-            white_noise = ""
-        else:
-            white_noise = np.random.normal(0, self.w_noise, size=(self.truncation_length, self.n_variables))
 
-        if output_runtime:
-            print('IT: 0\tBest cost: ', self.best_mae_global)
+        ### numpy array to store selected individuals in each generation for visualization purposes
+        sel_inds_hist = []
+
+        ### numpy array to store all individuals in each generation
+        all_inds_hist = []
+
+        white_noise = np.random.normal(0, .5, size=(self.truncation_length, self.n_variables))
+
+        ### list to store pm object in each iteration
+        prob_mod_hist = []
+        prob_clone_hist = []
+        #####################################################
 
         for _ in range(1, self.max_iter):
+        
+
+            ############################### Modified by Daniel Conde ###################################
+            lista = np.expand_dims(self.generation, axis=0) # Will not contain the evaluations
+            all_inds_hist.append(lista) #requires converting to 3D np.array after the for loop
+            #########################################################################################
+
             self._truncation()
-            self.generation += white_noise  # We add Gaussian white noise for avoiding genetic drift (optional)
+            
+            #################################################################################################################
+            ##### Added white noise to data to prevent 0 variance other EDAs than UMDA (UMDA has a minimum of 0.5 defined)
+            #print("(b) Mean: ", self.generation.mean(axis=0), "\tStd.: ", self.generation.std(axis=0))
+            if _ > 1:
+            	self.generation += white_noise
+            #print("(a) Mean: ", self.generation.mean(axis=0), "\tStd.: ", self.generation.std(axis=0))
+
+            #####################################################################################################################
+            
+            
             self._update_pm()
+
+            ##########Modified by Daniel Conde############
+            #Saving selected individuals with their evaluation after truncation in a list
+            #first we add evaluation column to generation array to create a (inds, variables+eval) array
+            list = np.column_stack((self.generation, self.evaluations))
+            #Now we add a dimension (generation), axis at the beginning
+            list = np.expand_dims(list, axis=0)
+            sel_inds_hist.append(list)
+            # requires converting to 3D np.array after the for loop
+
+            ### Saving probalistic model object using deepcopy fails often. Used only with UMDA
+            if isinstance(self.pm, UniGauss):
+                pm_temp = copy.deepcopy(self.pm)
+                prob_clone_hist.append(pm_temp)
+            else:
+                ### Saving probabilistic model object using clone method from pybnesian
+                pm_clone_temp = self.pm.pm.clone()
+                prob_clone_hist.append(pm_clone_temp)
+
+            ##############################################
 
             self._new_generation()
             self._check_generation(cost_function)
@@ -197,8 +244,16 @@ class EDA(ABC):
             best_ind_local = np.where(self.evaluations == best_mae_local)[0][0]
             best_ind_local = self.generation[best_ind_local]
 
+            ###############Modified by Daniel Conde###########
+            # update array to store best individual in each generation
+            #first we reshape the new best ind array
+            best_ind_local = np.reshape(best_ind_local, (1, best_ind_local.size))
+            ## now we append it to the hist array
+            best_ind_hist = np.append(best_ind_hist, best_ind_local, axis=0)
+            ##################################################
+
             # update the best values ever
-            if best_mae_local < self.best_mae_global * (1 + ftol):
+            if best_mae_local < self.best_mae_global*(1+self.tolerance):
                 self.best_mae_global = best_mae_local
                 self.best_ind_global = best_ind_local
                 not_better = 0
@@ -210,14 +265,25 @@ class EDA(ABC):
 
             if output_runtime:
                 print('IT: ', _, '\tBest cost: ', self.best_mae_global)
+                ### Before IT: _, we were not printing the best individual in the starting gen so we had a mismatch ###
+                ### in the number of best individuals ###
 
         if self.disp:
             print("\tNFEVALS = " + str(len(history) * self.size_gen) + " F = " + str(self.best_mae_global))
             print("\tX = " + str(self.best_ind_global))
 
         t2 = process_time()
+
+        ##############Modified by Daniel Conde#########################
+        # converting list to 3D numpy array
+        sel_inds_hist = np.concatenate(sel_inds_hist, axis=0)
+        all_inds_hist = np.concatenate(all_inds_hist, axis=0)
+        ###########################################################
+
+        ####################Modified by Daniel Conde ##############
+        ##### added best_ind_hist, sel_inds_hist, all_inds_hist, prob_mod_hist, prob_clone_hist to eda_result >>> requires changes in eda_result.py #######
         eda_result = EdaResult(self.best_ind_global, self.best_mae_global, len(history) * self.size_gen,
-                               history, self.export_settings(), t2-t1)
+                               history, best_ind_hist, sel_inds_hist, all_inds_hist , prob_clone_hist ,self.export_settings(), t2-t1)
 
         return eda_result
 
